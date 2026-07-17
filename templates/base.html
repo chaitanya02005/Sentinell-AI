@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" style="color-scheme:light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Sentinell.AI{% endblock %}</title>
+  <meta name="description" content="Sentinell.AI – AI Prompt Firewall for Enterprise"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260607-pastel"/>
+</head>
+<body>
+
+{% if user.is_authenticated %}
+
+<!-- Mobile sidebar overlay backdrop -->
+<div id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-brand-icon"><i class="bi bi-shield-lock-fill"></i></div>
+    <div class="sidebar-brand-name">Sentinell<span>.AI</span></div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Navigation</div>
+
+    <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+       href="{% url 'dashboard' %}" data-label="Dashboard">
+      <i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span>
+    </a>
+
+    <a class="nav-item {% if request.resolver_match.url_name == 'prompt' %}active{% endif %}"
+       href="{% url 'prompt' %}" data-label="Prompt AI">
+      <i class="bi bi-send-fill"></i><span>Prompt AI</span>
+    </a>
+
+    <a class="nav-item {% if request.resolver_match.url_name == 'gateway_demo' %}active{% endif %}"
+       href="{% url 'gateway_demo' %}" data-label="LLM Gateway">
+      <i class="bi bi-diagram-3-fill"></i><span>LLM Gateway</span>
+    </a>
+
+    {% if user.role == 'ADMIN' %}
+    <a class="nav-item {% if request.resolver_match.url_name == 'logs' %}active{% endif %}"
+       href="{% url 'logs' %}" data-label="Audit Logs">
+      <i class="bi bi-journal-text"></i><span>Audit Logs</span>
+    </a>
+
+    <a class="nav-item {% if request.resolver_match.url_name == 'policy_rules' %}active{% endif %}"
+       href="{% url 'policy_rules' %}" data-label="Policy Rules">
+      <i class="bi bi-sliders"></i><span>Policy Rules</span>
+    </a>
+    {% endif %}
+
+  </nav>
+
+</aside>
+
+<!-- ══════════════ TOPBAR ══════════════ -->
+<header id="topbar">
+  <!-- Mobile hamburger (hidden on desktop via CSS) -->
+  <button id="mobile-menu-btn" title="Open menu" aria-label="Open menu"
+    style="display:none;width:34px;height:34px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--text-2);cursor:pointer;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0"
+    onclick="openMobileSidebar()">
+    <i class="bi bi-list"></i>
+  </button>
+  <button id="sidebar-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+    <i class="bi bi-layout-sidebar"></i>
+  </button>
+
+  <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+
+  <button class="topbar-command d-none d-md-flex" type="button" onclick="openCmd()" aria-label="Open command search">
+    <i class="bi bi-search"></i><span>Search navigation and actions</span><kbd>Ctrl K</kbd>
+  </button>
+
+  <div class="topbar-actions">
+    <!-- Firewall Status -->
+    <span class="firewall-pulse d-none d-md-flex">
+      <span class="pulse-dot"></span>Firewall Active
+    </span>
+
+    <!-- Profile button — icon only -->
+    <button class="profile-topbar-btn" id="profile-topbar-btn" onclick="openProfile()" title="My Profile" aria-label="My Profile">
+      <div class="profile-topbar-avatar"><i class="bi bi-person-fill"></i></div>
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════ FLASH MESSAGES ══════════════ -->
+{% if messages %}
+<div style="position:fixed;top:calc(var(--topbar-h) + 0.75rem);right:1rem;z-index:500;display:flex;flex-direction:column;gap:0.4rem">
+  {% for message in messages %}
+  <div class="toast toast-{% if 'error' in message.tags or 'danger' in message.tags %}danger{% elif 'success' in message.tags %}success{% else %}info{% endif %}" role="alert">
+    <i class="bi bi-{% if 'error' in message.tags or 'danger' in message.tags %}exclamation-triangle-fill{% elif 'success' in message.tags %}check-circle-fill{% else %}info-circle-fill{% endif %}"></i>
+    {{ message }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ══════════════ PAGE CONTENT ══════════════ -->
+<div id="page-content">
+  <main>{% block content %}{% endblock %}</main>
+  <footer class="footer"><div class="container text-center"><span class="text-muted small"><i class="bi bi-shield-lock-fill text-accent me-1"></i>Sentinell.AI &mdash; Secure AI Prompt Firewall &copy; 2026</span></div></footer>
+</div>
+
+<!-- ══════════════ COMMAND PALETTE ══════════════ -->
+<div id="cmd-overlay" role="dialog" aria-label="Command palette" onclick="if(event.target===this)closeCmd()">
+  <div id="cmd-palette">
+    <input type="text" id="cmd-search" placeholder="Search pages, actions…" oninput="filterCmd(this.value)" autocomplete="off"/>
+    <div id="cmd-results">
+      <div class="cmd-section">Navigation</div>
+      <a class="cmd-item" href="{% url 'dashboard' %}"><i class="bi bi-grid-1x2-fill"></i>Dashboard<kbd class="cmd-kbd">G D</kbd></a>
+      <a class="cmd-item" href="{% url 'prompt' %}"><i class="bi bi-send-fill"></i>Prompt AI<kbd class="cmd-kbd">G P</kbd></a>
+      <a class="cmd-item" href="{% url 'gateway_demo' %}"><i class="bi bi-diagram-3-fill"></i>LLM Gateway<kbd class="cmd-kbd">G W</kbd></a>
+      {% if user.role == 'ADMIN' %}
+      <a class="cmd-item" href="{% url 'logs' %}"><i class="bi bi-journal-text"></i>Audit Logs<kbd class="cmd-kbd">G L</kbd></a>
+      <a class="cmd-item" href="{% url 'policy_rules' %}"><i class="bi bi-sliders"></i>Policy Rules<kbd class="cmd-kbd">G R</kbd></a>
+      {% endif %}
+      <div class="cmd-section">Account</div>
+      <div class="cmd-item" onclick="openProfile();closeCmd()"><i class="bi bi-person-circle"></i>My Profile</div>
+      <a class="cmd-item" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i>Logout</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PROFILE PANEL ══════════════ -->
+<div id="profile-overlay" onclick="if(event.target===this)closeProfile()" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.25);backdrop-filter:blur(2px)">
+  <div id="profile-panel" style="position:absolute;top:0;right:0;width:340px;height:100vh;background:var(--bg);border-left:1px solid var(--border);box-shadow:-8px 0 32px rgba(0,0,0,0.12);display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1)">
+
+    <!-- Panel Header -->
+    <div style="padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:0.95rem;font-weight:700;color:var(--text)"><i class="bi bi-person-circle me-2" style="color:var(--primary)"></i>My Profile</div>
+      <button onclick="closeProfile()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+
+    <!-- Avatar + Name -->
+    <div style="padding:1.5rem 1.25rem;text-align:center;border-bottom:1px solid var(--border);background:var(--bg-1)">
+      <div style="width:72px;height:72px;border-radius:18px;background:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-size:1.8rem;color:#fff;font-weight:700;margin-bottom:0.75rem;box-shadow:0 4px 16px var(--primary-g)">{{ user.full_name|default:user.username|slice:":1"|upper }}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--text);letter-spacing:-0.3px">{{ user.full_name|default:user.username|title }}</div>
+      <div style="font-size:0.8rem;color:var(--text-3);margin-top:2px">{{ user.email }}</div>
+      <div style="margin-top:0.6rem">
+        <span class="role-badge role-{{ user.role|lower }}" style="font-size:0.72rem">
+          <i class="bi bi-person-badge-fill"></i>{{ user.get_role_display }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Info rows -->
+    <div style="padding:1rem 1.25rem;flex:1;overflow-y:auto">
+
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-3);margin-bottom:0.5rem">Account Information</div>
+
+      <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.85rem;background:var(--bg-1);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2)">
+            <i class="bi bi-person-fill" style="color:var(--primary);width:16px;text-align:center"></i>Full Name
+          </div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text)">{{ user.full_name|default:"—" }}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.85rem;background:var(--bg-1);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2)">
+            <i class="bi bi-envelope-fill" style="color:var(--primary);width:16px;text-align:center"></i>Email
+          </div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text);word-break:break-all">{{ user.email }}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.85rem;background:var(--bg-1);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2)">
+            <i class="bi bi-shield-fill" style="color:var(--primary);width:16px;text-align:center"></i>Role
+          </div>
+          <span class="role-badge role-{{ user.role|lower }}" style="font-size:0.72rem">
+            <i class="bi bi-person-badge-fill"></i>{{ user.get_role_display }}
+          </span>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.85rem;background:var(--bg-1);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2)">
+            <i class="bi bi-at" style="color:var(--primary);width:16px;text-align:center"></i>Username
+          </div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text)">{{ user.username }}</div>
+        </div>
+
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.85rem;background:var(--bg-1);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2)">
+            <i class="bi bi-calendar3" style="color:var(--primary);width:16px;text-align:center"></i>Member Since
+          </div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text)">{{ user.date_joined|date:"M d, Y" }}</div>
+        </div>
+
+      </div>
+
+      <!-- Security info -->
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-3);margin-bottom:0.5rem">Security</div>
+      <div style="padding:0.75rem 0.85rem;background:var(--success-g);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;color:var(--text-2);display:flex;align-items:center;gap:8px">
+        <i class="bi bi-shield-lock-fill" style="color:var(--success)"></i>
+        Account protected with end-to-end encryption
+      </div>
+    </div>
+
+    <!-- Footer actions -->
+    <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:8px">
+      <a href="{% url 'logout' %}" style="flex:1;padding:0.65rem;background:var(--danger-g);color:var(--danger);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-weight:600;text-decoration:none;text-align:center;transition:all 0.15s ease" onmouseover="this.style.background='var(--danger)';this.style.color='#fff'" onmouseout="this.style.background='var(--danger-g)';this.style.color='var(--danger)'">
+        <i class="bi bi-box-arrow-right me-1"></i>Sign Out
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ TOAST CONTAINER ══════════════ -->
+<div id="toast-container"></div>
+
+{% endif %}
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* ── THEME (light mode locked) ── */
+document.documentElement.setAttribute('data-theme','light');
+
+/* ── PROFILE PANEL ── */
+function openProfile(){
+  var ov=document.getElementById('profile-overlay');
+  var panel=document.getElementById('profile-panel');
+  if(!ov||!panel)return;
+  ov.style.display='block';
+  requestAnimationFrame(function(){panel.style.transform='translateX(0)';});
+  document.body.style.overflow='hidden';
+}
+function closeProfile(){
+  var ov=document.getElementById('profile-overlay');
+  var panel=document.getElementById('profile-panel');
+  if(!ov||!panel)return;
+  panel.style.transform='translateX(100%)';
+  setTimeout(function(){ov.style.display='none';},300);
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeProfile();});
+
+/* ── SIDEBAR ── */
+var sidebarEl=document.getElementById('sidebar');
+var topbarEl=document.getElementById('topbar');
+var contentEl=document.getElementById('page-content');
+function applySidebar(collapsed){
+  if(!sidebarEl)return;
+  if(collapsed){sidebarEl.classList.add('collapsed');document.body.classList.add('sidebar-collapsed')}
+  else{sidebarEl.classList.remove('collapsed');document.body.classList.remove('sidebar-collapsed')}
+}
+applySidebar(localStorage.getItem('sidebarCollapsed')==='1');
+var toggleBtn=document.getElementById('sidebar-toggle');
+if(toggleBtn)toggleBtn.addEventListener('click',function(){
+  var c=!sidebarEl.classList.contains('collapsed');
+  applySidebar(c);localStorage.setItem('sidebarCollapsed',c?'1':'0');
+});
+
+/* Mobile sidebar open/close */
+function openMobileSidebar(){
+  if(!sidebarEl)return;
+  sidebarEl.classList.add('mobile-open');
+  var ov=document.getElementById('sidebar-overlay');
+  if(ov)ov.classList.add('open');
+}
+function closeMobileSidebar(){
+  if(!sidebarEl)return;
+  sidebarEl.classList.remove('mobile-open');
+  var ov=document.getElementById('sidebar-overlay');
+  if(ov)ov.classList.remove('open');
+}
+
+/* ── COMMAND PALETTE ── */
+function openCmd(){document.getElementById('cmd-overlay').classList.add('open');setTimeout(function(){document.getElementById('cmd-search').focus()},50)}
+function closeCmd(){document.getElementById('cmd-overlay').classList.remove('open');document.getElementById('cmd-search').value='';filterCmd('')}
+function filterCmd(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.cmd-item').forEach(function(el){
+    el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none'
+  });
+}
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openCmd()}
+  if(e.key==='Escape')closeCmd();
+});
+
+/* ── TOAST ── */
+function showToast(msg,type){
+  type=type||'info';
+  var icons={success:'check-circle-fill',danger:'exclamation-triangle-fill',info:'info-circle-fill'};
+  var t=document.createElement('div');
+  t.className='toast toast-'+type;
+  t.innerHTML='<i class="bi bi-'+icons[type]+'"></i>'+msg;
+  var c=document.getElementById('toast-container');
+  if(c){c.appendChild(t);setTimeout(function(){t.classList.add('removing');setTimeout(function(){t.remove()},300)},3500)}
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

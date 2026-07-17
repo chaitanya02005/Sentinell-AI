@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand-row">
+        <div class="brand-mark">S</div>
+        <div>
+          <h1>Sentinell<span>.AI</span></h1>
+          <p>LLM firewall control</p>
+        </div>
+      </header>
+
+      <section class="status-card" id="statusCard">
+        <div class="status-led" id="statusLed"></div>
+        <div>
+          <strong id="statusTitle">Checking status</strong>
+          <p id="status">Connecting to the backend...</p>
+        </div>
+      </section>
+
+      <form id="loginForm" class="panel">
+        <label>
+          <span>Backend URL</span>
+          <input id="backendUrl" type="url" value="http://127.0.0.1:8000">
+        </label>
+        <label>
+          <span>Email</span>
+          <input id="email" type="email" autocomplete="username" placeholder="name@company.com">
+        </label>
+        <label>
+          <span>Password</span>
+          <input id="password" type="password" autocomplete="current-password" placeholder="Password">
+        </label>
+        <button class="primary-btn" type="submit" id="loginButton">Sign in</button>
+      </form>
+
+      <section id="signedIn" class="panel" hidden>
+        <div class="identity-row">
+          <div class="avatar" id="avatar">S</div>
+          <div>
+            <strong id="userEmail"></strong>
+            <span id="userRole"></span>
+          </div>
+        </div>
+
+        <div class="settings-list">
+          <label class="toggle-row">
+            <span><strong>Prompt firewall</strong><small>Inspect prompts before send</small></span>
+            <input id="promptProtection" type="checkbox">
+          </label>
+          <label class="toggle-row">
+            <span><strong>Response monitor</strong><small>Blur unsafe LLM output</small></span>
+            <input id="responseMonitoring" type="checkbox">
+          </label>
+          <label class="toggle-row">
+            <span><strong>Attachment scan</strong><small>Inspect files before upload</small></span>
+            <input id="attachmentScanning" type="checkbox">
+          </label>
+          <label class="toggle-row">
+            <span><strong>Safe preview</strong><small>Show masked text in warnings</small></span>
+            <input id="showPanelPreview" type="checkbox">
+          </label>
+        </div>
+
+        <button class="secondary-btn" id="logout" type="button">Sign out</button>
+      </section>
+
+      <footer>
+        <span></span> Secured prompts, responses, and audit traces
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

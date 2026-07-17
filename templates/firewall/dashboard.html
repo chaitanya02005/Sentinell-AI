@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Security Overview - Sentinell.AI{% endblock %}
+{% block page_title %}<i class="bi bi-grid-1x2-fill me-2" style="color:var(--primary)"></i>Security Overview{% endblock %}
+
+{% block content %}
+<div class="page-wrap overview-page fade-in" data-testid="security-control-plane">
+  <header class="overview-header slide-up stagger-1">
+    <div>
+      <div class="overview-status"><span class="soft-led"></span>Protection active <span>{{ scope_label }}</span></div>
+      <h1>Security Overview</h1>
+      <p>A clear view of protected AI activity and policy outcomes.</p>
+    </div>
+    {% if user.role == 'ADMIN' %}
+    <div class="overview-actions">
+      <a href="{% url 'logs' %}" class="quiet-action"><i class="bi bi-journal-text"></i>Audit logs</a>
+      <a href="{% url 'policy_rules' %}" class="quiet-action"><i class="bi bi-sliders"></i>Policies</a>
+    </div>
+    {% endif %}
+  </header>
+
+  <section class="health-band slide-up stagger-2" aria-label="Health score">
+    <div class="data-stream" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="health-copy">
+      <span class="section-label">Health Score</span>
+      <div class="health-value-row">
+        <strong>{{ health_score }}</strong><span>/100</span>
+        <span class="health-state {% if health_score >= 80 %}health-good{% elif health_score >= 55 %}health-watch{% else %}health-risk{% endif %}">
+          {% if health_score >= 80 %}Secured{% elif health_score >= 55 %}Monitor{% else %}Attention needed{% endif %}
+        </span>
+      </div>
+      <p>Based on active semantic, policy, identity, and vault controls across {{ total_checks }} inspected events.</p>
+    </div>
+    <div class="health-ring" style="--score:{{ health_score }}">
+      <span>{{ health_score }}%</span>
+    </div>
+  </section>
+
+  <section class="metric-strip slide-up stagger-3" aria-label="Security metrics">
+    <article class="metric-cell">
+      <span class="metric-icon metric-blue"><i class="bi bi-activity"></i></span>
+      <div><span class="metric-label">Inspected</span><strong>{{ total_checks }}</strong><small>{{ total_submissions }} prompts, {{ response_checks }} responses</small></div>
+    </article>
+    <article class="metric-cell">
+      <span class="metric-icon metric-red"><i class="bi bi-shield-x"></i></span>
+      <div><span class="metric-label">Blocked</span><strong>{{ blocked_prompts|add:blocked_responses }}</strong><small>Threats stopped before exposure</small></div>
+    </article>
+    <article class="metric-cell">
+      <span class="metric-icon metric-green"><i class="bi bi-eye-slash"></i></span>
+      <div><span class="metric-label">Protected</span><strong>{{ masked_prompts|add:redacted_responses }}</strong><small>Values masked or redacted</small></div>
+    </article>
+    <article class="metric-cell">
+      <span class="metric-icon metric-violet"><i class="bi bi-percent"></i></span>
+      <div><span class="metric-label">Intervention</span><strong>{{ intervention_rate }}%</strong><small>Average risk {{ average_risk }}%</small></div>
+    </article>
+  </section>
+
+  <details class="micro-details slide-up stagger-4">
+    <summary>
+      <span><i class="bi bi-bar-chart-line"></i><strong>Technical details</strong><small>Decision outcomes, identity context, and vault status</small></span>
+      <i class="bi bi-chevron-down detail-chevron"></i>
+    </summary>
+    <div class="detail-grid">
+      <section class="glass-panel analytics-panel" data-testid="decision-analytics">
+        <div class="panel-heading"><div><span class="section-label">Policy outcomes</span><h2>Decision Analytics</h2></div><span>{{ total_checks }} transactions</span></div>
+        <div class="decision-columns">
+          <div class="decision-column">
+            <h3><i class="bi bi-box-arrow-up-right"></i>Prompt decisions</h3>
+            {% for decision in prompt_decisions %}
+            <div class="decision-row">
+              <div><span class="decision-{{ decision.action|lower }}">{{ decision.action }}</span><span>{{ decision.count }} <small>{{ decision.percent }}%</small></span></div>
+              <div class="decision-track"><span class="fill-{{ decision.action|lower }}" style="width:{{ decision.percent }}%"></span></div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="decision-column">
+            <h3><i class="bi bi-box-arrow-in-down-left"></i>Response decisions</h3>
+            {% for decision in response_decisions %}
+            <div class="decision-row">
+              <div><span class="decision-{{ decision.action|lower }}">{{ decision.action }}</span><span>{{ decision.count }} <small>{{ decision.percent }}%</small></span></div>
+              <div class="decision-track"><span class="fill-{{ decision.action|lower }}" style="width:{{ decision.percent }}%"></span></div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-panel" data-testid="zero-trust-context">
+        <div class="panel-heading"><div><span class="section-label">Authenticated context</span><h2>Zero Trust Identity</h2></div><i class="bi bi-fingerprint"></i></div>
+        <dl class="context-list">
+          <div><dt>Provider</dt><dd>{{ identity_context.auth_provider }}</dd></div>
+          <div><dt>Role</dt><dd>{{ user.role }}</dd></div>
+          <div><dt>Tenant</dt><dd>{{ identity_context.tenant_id|default:"Local tenant" }}</dd></div>
+          <div><dt>Department</dt><dd>{{ identity_context.department|default:"Not assigned" }}</dd></div>
+          <div><dt>Session</dt><dd class="status-secured"><span class="soft-led"></span>Authenticated</dd></div>
+        </dl>
+      </section>
+
+      <section class="glass-panel" data-testid="pqc-vault-status">
+        <div class="panel-heading"><div><span class="section-label">Cryptographic control</span><h2>Post-Quantum Vault</h2></div><i class="bi bi-safe2"></i></div>
+        <div class="vault-summary {% if pqc_ready %}vault-ready{% else %}vault-config{% endif %}">
+          <i class="bi bi-shield-lock"></i>
+          <div><strong>{% if pqc_ready %}ML-KEM-1024 active{% else %}Configuration required{% endif %}</strong><span>ML-KEM-1024 + AES-256-GCM</span></div>
+        </div>
+        <dl class="context-list">
+          <div><dt>Provider</dt><dd>{{ vault_provider }}</dd></div>
+          <div><dt>Key ID</dt><dd>{{ vault_key_id }}</dd></div>
+          <div><dt>Protected mappings</dt><dd>{{ vault_count }}</dd></div>
+          <div><dt>PQC mappings</dt><dd>{{ pqc_mappings }}</dd></div>
+        </dl>
+      </section>
+    </div>
+  </details>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.overview-page{max-width:1360px;margin:0 auto;padding:1.75rem}
+.overview-header{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.25rem}
+.overview-header h1{font-size:1.6rem;font-weight:750;color:var(--text);margin:.4rem 0 .25rem}
+.overview-header p{font-size:.84rem;color:var(--text-2);margin:0}
+.overview-status{display:flex;align-items:center;gap:.45rem;font-size:.69rem;font-weight:700;text-transform:uppercase;color:var(--success)}
+.overview-status>span:last-child{padding:.2rem .45rem;border-radius:5px;background:rgba(190,227,248,.55);color:var(--text-2);text-transform:none}
+.soft-led{width:7px;height:7px;border-radius:50%;background:#48a477;box-shadow:0 0 0 4px rgba(198,246,213,.78),0 0 12px rgba(72,164,119,.4);display:inline-block}
+.overview-actions{display:flex;gap:.5rem}
+.quiet-action{display:inline-flex;align-items:center;gap:.45rem;padding:.55rem .75rem;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.65);color:var(--text-2);font-size:.78rem;font-weight:650;text-decoration:none}
+.quiet-action:hover{border-color:#a9c9da;color:var(--text)}
+.health-band{position:relative;min-height:190px;display:flex;align-items:center;justify-content:space-between;gap:2rem;padding:2rem;border-radius:8px;overflow:hidden;background:linear-gradient(120deg,rgba(190,227,248,.58),rgba(255,255,255,.76) 48%,rgba(233,216,253,.58));border:1px solid rgba(255,255,255,.9);box-shadow:0 14px 36px rgba(45,55,72,.08);backdrop-filter:blur(14px)}
+.health-copy{position:relative;z-index:1;max-width:610px}
+.section-label{font-size:.64rem;color:var(--text-3);font-weight:750;text-transform:uppercase}
+.health-value-row{display:flex;align-items:center;gap:.35rem;margin:.35rem 0}
+.health-value-row>strong{font-size:2.75rem;line-height:1;font-weight:780;color:#1c2434}
+.health-value-row>span:not(.health-state){font-size:1rem;color:var(--text-3)}
+.health-state{margin-left:.6rem;padding:.32rem .58rem;border-radius:6px;font-size:.68rem;font-weight:750}
+.health-good{background:#c6f6d5;color:#276749}.health-watch{background:#fef3c7;color:#975a16}.health-risk{background:#fed7d7;color:#9b2c2c}
+.health-copy p{font-size:.78rem;color:var(--text-2);margin:.6rem 0 0;max-width:520px}
+.health-ring{--score:0;width:112px;height:112px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;background:conic-gradient(#77b5a0 calc(var(--score)*1%),rgba(255,255,255,.6) 0);position:relative;box-shadow:0 0 24px rgba(119,181,160,.22)}
+.health-ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:rgba(248,249,250,.94)}
+.health-ring span{position:relative;font-size:1.05rem;font-weight:750;color:var(--text)}
+.data-stream{position:absolute;inset:0;opacity:.28;pointer-events:none}
+.data-stream span{position:absolute;width:58%;height:42px;border-top:2px solid #80c9b0;border-radius:50%;transform:rotate(-6deg)}
+.data-stream span:nth-child(1){left:30%;top:24%}.data-stream span:nth-child(2){left:24%;top:48%;border-color:#a999cf}.data-stream span:nth-child(3){left:35%;top:70%;border-color:#83bad7}
+.metric-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:1rem 0;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.92);border-radius:8px;box-shadow:0 10px 26px rgba(45,55,72,.06);backdrop-filter:blur(14px)}
+.metric-cell{display:flex;align-items:center;gap:.8rem;padding:1rem;min-width:0}.metric-cell:not(:last-child){border-right:1px solid var(--border)}
+.metric-icon{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}.metric-blue{background:#bee3f8;color:#3f6f8b}.metric-red{background:#fed7d7;color:#a94455}.metric-green{background:#c6f6d5;color:#39785d}.metric-violet{background:#e9d8fd;color:#72589a}
+.metric-cell div{display:flex;flex-direction:column;min-width:0}.metric-label{font-size:.64rem;color:var(--text-3);font-weight:750;text-transform:uppercase}.metric-cell strong{font-size:1.35rem;color:var(--text);line-height:1.2}.metric-cell small{font-size:.67rem;color:var(--text-3);white-space:normal}
+.micro-details{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.58);overflow:hidden}
+.micro-details>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.15rem;cursor:pointer}.micro-details>summary::-webkit-details-marker{display:none}
+.micro-details>summary>span{display:grid;grid-template-columns:auto auto;align-items:center;column-gap:.55rem}.micro-details>summary i{color:#617d94}.micro-details>summary strong{font-size:.84rem;color:var(--text)}.micro-details>summary small{grid-column:2;font-size:.68rem;color:var(--text-3)}
+.detail-chevron{transition:transform .2s}.micro-details[open] .detail-chevron{transform:rotate(180deg)}
+.detail-grid{display:grid;grid-template-columns:1.35fr .8fr .9fr;gap:1rem;padding:1rem;border-top:1px solid var(--border);background:rgba(235,241,245,.42)}
+.glass-panel{background:rgba(255,255,255,.76);border:1px solid rgba(255,255,255,.95);border-radius:8px;overflow:hidden;box-shadow:0 8px 22px rgba(45,55,72,.055)}
+.panel-heading{min-height:62px;padding:.9rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:1rem}.panel-heading h2{font-size:.86rem;margin:.15rem 0 0;font-weight:720}.panel-heading>span,.panel-heading>i{font-size:.68rem;color:var(--text-3)}
+.decision-columns{display:grid;grid-template-columns:1fr 1fr}.decision-column{padding:1rem}.decision-column+ .decision-column{border-left:1px solid var(--border)}.decision-column h3{font-size:.72rem;color:var(--text-2);margin-bottom:.8rem}.decision-column h3 i{margin-right:.35rem}
+.decision-row{margin-bottom:.7rem}.decision-row>div:first-child{display:flex;justify-content:space-between;font-size:.68rem;font-weight:700}.decision-row small{color:var(--text-3)}.decision-track{height:6px;border-radius:3px;background:#ebf1f5;overflow:hidden;margin-top:.3rem}.decision-track span{display:block;height:100%}.fill-allow{background:#7fc9aa}.fill-tokenize,.fill-redact{background:#b7a0d8}.fill-block{background:#e4a1aa}.decision-allow{color:#39785d}.decision-tokenize,.decision-redact{color:#72589a}.decision-block{color:#a94455}
+.context-list{margin:0;padding:.65rem 1rem}.context-list div{display:flex;justify-content:space-between;gap:.8rem;padding:.48rem 0}.context-list div+div{border-top:1px solid var(--border)}.context-list dt{font-size:.67rem;color:var(--text-3);font-weight:550}.context-list dd{font-size:.68rem;color:var(--text);font-weight:650;margin:0;text-align:right;word-break:break-word}.status-secured{color:#39785d!important;display:flex;align-items:center;gap:.35rem}
+.vault-summary{display:flex;align-items:center;gap:.7rem;padding:.85rem 1rem}.vault-summary>i{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.72);display:grid;place-items:center}.vault-summary div{display:flex;flex-direction:column}.vault-summary strong{font-size:.72rem}.vault-summary span{font-size:.62rem;color:var(--text-2)}.vault-ready{background:#c6f6d5;color:#276749}.vault-config{background:#fed7d7;color:#9b2c2c}
+@media(max-width:1100px){.detail-grid{grid-template-columns:1fr 1fr}.analytics-panel{grid-column:1/-1}.metric-strip{grid-template-columns:1fr 1fr}.metric-cell:nth-child(2){border-right:0}.metric-cell:nth-child(-n+2){border-bottom:1px solid var(--border)}}
+@media(max-width:700px){.overview-page{padding:1rem}.overview-header{align-items:flex-start;flex-direction:column}.health-band{padding:1.35rem;min-height:170px}.health-ring{width:88px;height:88px}.health-value-row>strong{font-size:2.2rem}.metric-strip,.detail-grid{grid-template-columns:1fr}.metric-cell{border-right:0!important;border-bottom:1px solid var(--border)}.metric-cell:last-child{border-bottom:0}.analytics-panel{grid-column:auto}.decision-columns{grid-template-columns:1fr}.decision-column+.decision-column{border-left:0;border-top:1px solid var(--border)}}
+@media(max-width:430px){.health-band{align-items:flex-start}.health-ring{width:72px;height:72px}.health-ring span{font-size:.85rem}.overview-actions{width:100%}.quiet-action{flex:1;justify-content:center}}
+</style>
+{% endblock %}

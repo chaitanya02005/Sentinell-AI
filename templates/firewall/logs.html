@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs - Sentinell.AI{% endblock %}
+{% block page_title %}<i class="bi bi-journal-text me-2" style="color:var(--primary)"></i>Audit Logs{% endblock %}
+
+{% block content %}
+<div class="page-wrap audit-page fade-in">
+  <header class="audit-header slide-up stagger-1">
+    <div>
+      <h1 class="page-title">Audit Logs</h1>
+      <p class="page-subtitle">Human-readable prompt decisions with technical evidence available on demand.</p>
+    </div>
+    <span class="entry-count"><i class="bi bi-list-ul"></i>{{ logs|length }} entries</span>
+  </header>
+
+  <div class="filter-bar slide-up stagger-2">
+    <div class="log-search-wrap">
+      <i class="bi bi-search"></i>
+      <input type="text" id="log-search" class="log-search" placeholder="Search users, decisions, or detected data"/>
+    </div>
+    <select id="action-filter" class="log-filter-select" aria-label="Filter by action">
+      <option value="">All actions</option>
+      <option value="ALLOW">Allow</option>
+      <option value="BLOCK">Block</option>
+      <option value="TOKENIZE">Tokenize</option>
+    </select>
+    <select id="risk-filter" class="log-filter-select" aria-label="Filter by risk">
+      <option value="">All risk levels</option>
+      <option value="LOW">Low</option>
+      <option value="MODERATE">Moderate</option>
+      <option value="HIGH">High</option>
+      <option value="SEVERE">Severe</option>
+      <option value="CRITICAL">Critical</option>
+    </select>
+  </div>
+
+  {% if logs %}
+  <div class="logs-table-wrap slide-up stagger-3">
+    <div class="table-responsive">
+      <table class="logs-table" id="logs-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)" title="Sort">#</th>
+            <th onclick="sortTable(1)" title="Sort">Timestamp</th>
+            <th onclick="sortTable(2)" title="Sort">User</th>
+            <th onclick="sortTable(3)" title="Sort">Role</th>
+            <th onclick="sortTable(4)" title="Sort">Risk</th>
+            <th onclick="sortTable(5)" title="Sort">Decision</th>
+            <th>Detected</th>
+            <th>What happened</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="logs-tbody">
+          {% for log in logs %}
+          <tr class="log-row" data-href="{% url 'log_detail' log.id %}" data-action="{{ log.action }}" data-risk="{{ log.risk_level }}">
+            <td class="log-index">{{ forloop.counter }}</td>
+            <td class="log-time">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+            <td><strong>{{ log.user.username|default:"Deleted user" }}</strong></td>
+            <td>
+              {% if log.user %}
+              <span class="role-badge-sm role-{{ log.user.role|lower }}">{{ log.user.get_role_display }}</span>
+              {% else %}<span class="muted-value">-</span>{% endif %}
+            </td>
+            <td><span class="risk-badge-sm risk-{{ log.risk_level|lower }}">{{ log.risk_score }}%</span></td>
+            <td><span class="action-badge action-{{ log.action|lower }}">{{ log.action }}</span></td>
+            <td>
+              {% if log.detected_types %}
+                {% for dtype in log.detected_types %}<span class="detect-tag-sm">{{ dtype }}</span>{% endfor %}
+              {% else %}<span class="muted-value">None</span>{% endif %}
+            </td>
+            <td>
+              <div class="mobile-log-meta">
+                <span class="action-badge action-{{ log.action|lower }}">{{ log.action }}</span>
+                <span class="risk-badge-sm risk-{{ log.risk_level|lower }}">{{ log.risk_score }}%</span>
+                <time>{{ log.timestamp|date:"M d, H:i" }}</time>
+              </div>
+              <div class="plain-log-summary">{{ log.plain_english_summary }}</div>
+            </td>
+            <td class="text-center">
+              <div class="log-actions">
+                <a href="{% url 'log_detail' log.id %}" class="icon-action" onclick="event.stopPropagation()" title="View technical details" aria-label="View log {{ log.id }}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <form method="post" action="{% url 'log_delete' log.id %}" onclick="event.stopPropagation()" onsubmit="return confirm('Permanently delete audit log #{{ log.id }}? This cannot be undone.')">
+                  {% csrf_token %}
+                  <button type="submit" class="icon-action icon-action-danger" title="Delete old log" aria-label="Delete log {{ log.id }}">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="empty-filter-msg" class="text-center py-4 d-none">
+      <i class="bi bi-search"></i><span>No logs match your filters.</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="result-empty-state slide-up stagger-3">
+    <span class="empty-icon"><i class="bi bi-journal-x"></i></span>
+    <h5>No logs yet</h5>
+    <p>Prompt decisions appear here after users begin using the firewall.</p>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.audit-page{max-width:1500px;margin:0 auto}
+.audit-header{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;margin-bottom:1rem}
+.entry-count{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .65rem;border-radius:7px;background:rgba(190,227,248,.48);color:var(--text-2);font-size:.72rem;font-weight:650}
+.filter-bar{margin-bottom:.8rem}
+.log-search-wrap{position:relative;flex:1;max-width:440px}.log-search-wrap>i{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:.82rem}.log-search-wrap .log-search{width:100%;max-width:none;padding-left:2.25rem;background:rgba(255,255,255,.72)}
+.log-filter-select{background:rgba(255,255,255,.72)}
+.log-index,.log-time,.muted-value{font-size:.74rem;color:var(--text-3)}.log-time{white-space:nowrap}
+.logs-table{table-layout:fixed}
+.logs-table th:nth-child(1){width:42px}.logs-table th:nth-child(2){width:145px}.logs-table th:nth-child(3){width:105px}.logs-table th:nth-child(4){width:80px}.logs-table th:nth-child(5){width:70px}.logs-table th:nth-child(6){width:90px}.logs-table th:nth-child(7){width:170px}.logs-table th:nth-child(9){width:78px}
+.plain-log-summary{font-size:.75rem;line-height:1.4;color:var(--text-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mobile-log-meta{display:none}
+.logs-table .detect-tag-sm{display:inline-block;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.log-actions{display:flex;align-items:center;justify-content:center;gap:.35rem}.log-actions form{margin:0}
+.icon-action{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,.72);color:var(--text-2);display:inline-grid;place-items:center;text-decoration:none;cursor:pointer}
+.icon-action:hover{border-color:#9bc8df;color:#3f6f8b}.icon-action-danger{background:#fff5f5;color:#a94455;border-color:#fed7d7}.icon-action-danger:hover{background:#fed7d7;color:#8c3342;border-color:#efb7bf}
+#empty-filter-msg{color:var(--text-3);font-size:.82rem}#empty-filter-msg i{font-size:1.4rem;display:block;margin-bottom:.4rem}
+@media(max-width:700px){
+  .audit-page{padding:1rem}.audit-header{align-items:flex-start;flex-direction:column}.log-search-wrap{max-width:none;width:100%}.log-filter-select{flex:1}
+  .logs-table{min-width:0;table-layout:fixed}.logs-table th:nth-child(-n+7),.logs-table td:nth-child(-n+7){display:none}.logs-table th:nth-child(8){width:auto}.logs-table th:nth-child(9){width:66px}.logs-table td{padding:.8rem .7rem}
+  .mobile-log-meta{display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem}.mobile-log-meta time{font-size:.65rem;color:var(--text-3)}
+  .plain-log-summary{-webkit-line-clamp:4}.log-actions{flex-direction:column}
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.log-row').forEach(function(row){
+    row.style.cursor='pointer';
+    row.addEventListener('click',function(){window.location.href=this.dataset.href});
+  });
+
+  function applyFilters(){
+    var q=document.getElementById('log-search').value.toLowerCase();
+    var action=document.getElementById('action-filter').value.toUpperCase();
+    var risk=document.getElementById('risk-filter').value.toUpperCase();
+    var visible=0;
+    document.querySelectorAll('#logs-tbody tr').forEach(function(row){
+      var show=(!q||row.textContent.toLowerCase().includes(q))
+        &&(!action||row.dataset.action===action)
+        &&(!risk||row.dataset.risk===risk);
+      row.style.display=show?'':'none';
+      if(show)visible++;
+    });
+    document.getElementById('empty-filter-msg').classList.toggle('d-none',visible>0);
+  }
+  document.getElementById('log-search').addEventListener('input',applyFilters);
+  document.getElementById('action-filter').addEventListener('change',applyFilters);
+  document.getElementById('risk-filter').addEventListener('change',applyFilters);
+
+  var sortDir={};
+  function sortTable(column){
+    var body=document.getElementById('logs-tbody');
+    var rows=Array.from(body.querySelectorAll('tr'));
+    sortDir[column]=!sortDir[column];
+    rows.sort(function(left,right){
+      var a=left.cells[column]?left.cells[column].textContent.trim():'';
+      var b=right.cells[column]?right.cells[column].textContent.trim():'';
+      return sortDir[column]?a.localeCompare(b,undefined,{numeric:true}):b.localeCompare(a,undefined,{numeric:true});
+    });
+    rows.forEach(function(row){body.appendChild(row)});
+    document.querySelectorAll('#logs-table thead th').forEach(function(header,index){
+      header.classList.remove('sort-asc','sort-desc');
+      if(index===column)header.classList.add(sortDir[column]?'sort-asc':'sort-desc');
+    });
+  }
+</script>
+{% endblock %}

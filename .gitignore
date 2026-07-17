@@ -1,0 +1,39 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime artifacts
+.pydeps/
+db.sqlite3
+server.log
+server.err.log
+staticfiles/
+
+# Generated test reports / exports
+test_dataset/dataset_export.csv
+test_dataset/validation_report.txt
+test_dataset/*_report.txt

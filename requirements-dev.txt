@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Optional adversarial benchmark dataset loader.
+datasets>=2.14

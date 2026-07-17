@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}Log #{{ log.id }} – Sentinell.AI{% endblock %}
+{% block page_title %}<i class="bi bi-file-text me-2" style="color:var(--primary)"></i>Log Entry #{{ log.id }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap fade-in">
+
+  <div class="mb-4 slide-up stagger-1">
+    <a href="{% url 'logs' %}" class="btn-back">
+      <i class="bi bi-arrow-left me-2"></i>Back to Audit Logs
+    </a>
+  </div>
+
+  <div class="d-flex align-items-center gap-3 mb-4 flex-wrap slide-up stagger-2">
+    <h3 class="page-title mb-0">Log Entry #{{ log.id }}</h3>
+    <span class="action-badge action-{{ log.action|lower }}">{{ log.action }}</span>
+    <span class="risk-badge risk-{{ log.risk_level|lower }}">{{ log.risk_score }}% – {{ log.risk_level }}</span>
+    <span style="color:var(--text-3);font-size:0.83rem;margin-left:auto">
+      <i class="bi bi-clock me-1"></i>{{ log.timestamp|date:"Y-m-d H:i:s" }}
+    </span>
+  </div>
+
+  <div class="row g-4 slide-up stagger-3">
+
+    <!-- Left Column -->
+    <div class="col-lg-4">
+
+      <!-- Identity Card -->
+      <div class="detail-card mb-4">
+        <div class="detail-card-header"><i class="bi bi-person-badge"></i>Identity</div>
+        <div class="detail-card-body">
+          <div class="detail-row"><span class="detail-label">User</span><span class="detail-value"><strong>{{ log.user.username }}</strong></span></div>
+          <div class="detail-row"><span class="detail-label">Role</span><span class="detail-value"><span class="role-badge role-{{ log.user.role|lower }}">{{ log.user.get_role_display }}</span></span></div>
+          <div class="detail-row"><span class="detail-label">Timestamp</span><span class="detail-value" style="font-size:0.78rem;color:var(--text-3)">{{ log.timestamp|date:"Y-m-d H:i:s" }}</span></div>
+          <div class="detail-row"><span class="detail-label">Log ID</span><span class="detail-value" style="color:var(--text-3)">#{{ log.id }}</span></div>
+        </div>
+      </div>
+
+      <!-- Risk Assessment -->
+      <div class="detail-card mb-4">
+        <div class="detail-card-header risk-header-{{ log.risk_level|lower }}"><i class="bi bi-shield-exclamation"></i>Risk Assessment</div>
+        <div class="detail-card-body">
+          <div class="detail-row"><span class="detail-label">Risk Level</span><span class="detail-value"><span class="risk-badge risk-{{ log.risk_level|lower }}">{{ log.risk_level }}</span></span></div>
+          <div class="detail-row"><span class="detail-label">Risk Score</span><span class="detail-value risk-score-val risk-{{ log.risk_level|lower }} fw-bold fs-5">{{ log.risk_score }}%</span></div>
+          <div class="mt-3">
+            <div class="risk-bar-track"><div class="risk-bar-fill risk-bar-{{ log.risk_level|lower }}" style="width:{{ log.risk_score }}%"></div></div>
+            <div class="risk-bar-labels"><span>LOW</span><span>MOD</span><span>HIGH</span><span>SEV</span><span>CRIT</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Firewall Decision -->
+      <div class="detail-card mb-4">
+        <div class="detail-card-header"><i class="bi bi-diagram-3"></i>Firewall Decision</div>
+        <div class="detail-card-body">
+          <div class="detail-row"><span class="detail-label">Action</span><span class="detail-value"><span class="action-badge action-{{ log.action|lower }}">{{ log.action }}</span></span></div>
+          <div class="detail-row">
+            <span class="detail-label">Threats</span>
+            <span class="detail-value">
+              {% if log.detected_types %}
+              <div class="d-flex flex-wrap gap-1 mt-1 justify-content-end">{% for dtype in log.detected_types %}<span class="detect-tag">{{ dtype|upper }}</span>{% endfor %}</div>
+              {% else %}<span style="color:var(--text-3);font-size:0.8rem">None detected</span>{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Policy Decisions -->
+      {% if log.reasons %}
+      <div class="detail-card">
+        <div class="detail-card-header"><i class="bi bi-list-check"></i>Policy Decisions</div>
+        <div class="detail-card-body">
+          <ul class="reason-list">{% for reason in log.reasons %}<li><i class="bi bi-arrow-right-short me-1" style="color:var(--text-3)"></i>{{ reason }}</li>{% endfor %}</ul>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-lg-8">
+
+      <!-- Ephemeral Access Control Banner -->
+      <div class="detail-card mb-4" id="ephemeral-banner" style="border-color:rgba(251,191,36,0.35);background:rgba(251,191,36,0.04)">
+        <div class="detail-card-body d-flex align-items-center gap-3 py-3">
+          <i class="bi bi-eye-slash-fill" style="font-size:1.5rem;color:var(--warning);flex-shrink:0" id="ephemeral-icon"></i>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:0.9rem;color:var(--warning)" id="ephemeral-title">Sensitive Data — Masked</div>
+            <div style="font-size:0.78rem;color:var(--text-2)" id="ephemeral-desc">
+              Sensitive fields are masked by default. Click <strong>Reveal</strong> for a <strong>{{ ephemeral_ttl }}-second</strong> ephemeral viewing window.
+              Access is time-limited and audit-logged.
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2" id="ephemeral-controls">
+            <div class="ephemeral-timer d-none" id="ephemeral-timer">
+              <svg width="44" height="44" viewBox="0 0 44 44" id="timer-svg">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--bg-2)" stroke-width="3"/>
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--warning)" stroke-width="3"
+                  stroke-linecap="round" stroke-dasharray="113.1" stroke-dashoffset="0"
+                  id="timer-arc" style="transition:stroke-dashoffset 1s linear;transform:rotate(-90deg);transform-origin:center"/>
+              </svg>
+              <span class="timer-text" id="timer-text">{{ ephemeral_ttl }}</span>
+            </div>
+            <button class="btn-reveal" id="btn-reveal" onclick="requestEphemeralAccess()">
+              <i class="bi bi-eye-fill me-1"></i>Reveal
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Original Prompt -->
+      <div class="detail-card mb-4">
+        <div class="detail-card-header"><i class="bi bi-chat-left-text"></i>Original Prompt <span class="ms-auto" style="font-weight:400;font-size:0.7rem;text-transform:none">As submitted by user</span></div>
+        <div class="detail-card-body">
+          <div class="prompt-full-box sensitive-field" id="field-original" data-masked="{{ masked_original }}">{{ masked_original }}</div>
+        </div>
+      </div>
+
+      <!-- Processed Prompt (Masked Output) -->
+      <div class="detail-card mb-4">
+        <div class="detail-card-header"><i class="bi bi-shield-check"></i>Processed Prompt <span class="ms-auto" style="font-weight:400;font-size:0.7rem;text-transform:none">After masking / blocking</span></div>
+        <div class="detail-card-body">
+          <div class="processed-box sensitive-field" id="field-processed" data-masked="{{ masked_processed }}">{{ masked_processed }}</div>
+        </div>
+      </div>
+
+      <!-- AI Response -->
+      <div class="detail-card">
+        <div class="detail-card-header"><i class="bi bi-robot" style="color:var(--accent)"></i>AI Response <span class="ms-auto" style="font-weight:400;font-size:0.7rem;text-transform:none">Returned to user</span></div>
+        <div class="detail-card-body">
+          {% if log.ai_response and log.ai_response != "[BLOCKED]" %}
+          <div class="ai-response-box">
+            <div class="ai-avatar"><i class="bi bi-cpu-fill"></i></div>
+            <div class="ai-response-text sensitive-field" id="field-ai" data-masked="{{ masked_ai }}">{{ masked_ai }}</div>
+          </div>
+          {% else %}
+          <div class="block-message py-3">
+            <i class="bi bi-shield-exclamation fs-2 mb-2 d-block"></i>
+            <p class="mb-0 small">No AI response — prompt was blocked before reaching AI.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+/* ── Ephemeral access styles ─────────────────────────────────────── */
+.btn-reveal {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:8px 18px; background:var(--warning); color:#1a1a2e;
+  border:none; border-radius:10px; font-size:0.82rem; font-weight:700;
+  cursor:pointer; transition:background 0.15s,transform 0.1s,opacity 0.2s;
+  white-space:nowrap;
+}
+.btn-reveal:hover { background:#f59e0b; transform:scale(1.03); }
+.btn-reveal:active { transform:scale(0.97); }
+.btn-reveal:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+
+.ephemeral-timer {
+  position:relative; width:44px; height:44px;
+  display:flex; align-items:center; justify-content:center;
+}
+.timer-text {
+  position:absolute; font-size:0.85rem; font-weight:800;
+  color:var(--warning); font-family:'JetBrains Mono',monospace;
+}
+
+/* Sensitive field masking animation */
+.sensitive-field {
+  transition:color 0.3s ease, text-shadow 0.3s ease;
+}
+.sensitive-field.revealed {
+  animation:reveal-glow 0.5s ease;
+}
+.sensitive-field.re-masked {
+  color:var(--text-3) !important;
+  user-select:none !important;
+}
+
+@keyframes reveal-glow {
+  0% { text-shadow:0 0 20px rgba(251,191,36,0.5); }
+  100% { text-shadow:none; }
+}
+
+/* Banner state transitions */
+.ephemeral-active {
+  border-color:rgba(34,211,153,0.4) !important;
+  background:rgba(34,211,153,0.05) !important;
+}
+.ephemeral-expired {
+  border-color:rgba(248,113,113,0.35) !important;
+  background:rgba(248,113,113,0.04) !important;
+}
+</style>
+
+<script>
+(function () {
+  var LOG_ID = {{ log.id }};
+  var TTL = {{ ephemeral_ttl }};
+  var CSRF = '{{ csrf_token }}';
+  var timerInterval = null;
+
+  // DOM elements
+  var banner   = document.getElementById('ephemeral-banner');
+  var icon     = document.getElementById('ephemeral-icon');
+  var title    = document.getElementById('ephemeral-title');
+  var desc     = document.getElementById('ephemeral-desc');
+  var btnReveal = document.getElementById('btn-reveal');
+  var timerEl  = document.getElementById('ephemeral-timer');
+  var timerText = document.getElementById('timer-text');
+  var timerArc = document.getElementById('timer-arc');
+  var fields   = document.querySelectorAll('.sensitive-field');
+
+  var CIRCUMFERENCE = 2 * Math.PI * 18; // ~113.1
+
+  window.requestEphemeralAccess = function () {
+    btnReveal.disabled = true;
+    btnReveal.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Requesting…';
+
+    fetch('/logs/' + LOG_ID + '/reveal/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': CSRF,
+        'Content-Type': 'application/json',
+      },
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.status === 'granted') {
+        showRevealedData(data);
+        startCountdown(Math.ceil(data.remaining));
+      } else if (data.status === 'expired') {
+        maskAllFields();
+        showExpiredState();
+      } else {
+        alert(data.error || 'Access denied.');
+        resetRevealButton();
+      }
+    })
+    .catch(function () {
+      alert('Network error. Please try again.');
+      resetRevealButton();
+    });
+  };
+
+  function showRevealedData(data) {
+    // Update banner to active state
+    banner.classList.remove('ephemeral-expired');
+    banner.classList.add('ephemeral-active');
+    icon.className = 'bi bi-eye-fill';
+    icon.style.color = 'var(--success)';
+    title.textContent = 'Sensitive Data — REVEALED';
+    title.style.color = 'var(--success)';
+    desc.innerHTML = '<strong>Time-limited access granted.</strong> Data will be automatically re-masked when the timer expires.';
+
+    // Show timer, hide reveal button
+    timerEl.classList.remove('d-none');
+    btnReveal.classList.add('d-none');
+
+    // Populate fields with real data
+    var fieldMap = {
+      'field-original': data.original_prompt,
+      'field-processed': data.processed_prompt,
+      'field-ai': data.ai_response,
+    };
+
+    Object.keys(fieldMap).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && fieldMap[id]) {
+        el.textContent = fieldMap[id];
+        el.classList.remove('re-masked');
+        el.classList.add('revealed');
+        el.style.userSelect = '';
+      }
+    });
+  }
+
+  function startCountdown(seconds) {
+    var remaining = seconds;
+    timerText.textContent = remaining;
+    timerArc.style.strokeDashoffset = '0';
+    timerArc.style.stroke = 'var(--warning)';
+
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(function () {
+      remaining--;
+      timerText.textContent = remaining;
+
+      // Animate arc
+      var offset = ((TTL - remaining) / TTL) * CIRCUMFERENCE;
+      timerArc.style.strokeDashoffset = offset;
+
+      // Color transition: green → yellow → red
+      if (remaining <= 3) {
+        timerArc.style.stroke = 'var(--danger)';
+        timerText.style.color = 'var(--danger)';
+      } else if (remaining <= 5) {
+        timerArc.style.stroke = 'var(--warning)';
+        timerText.style.color = 'var(--warning)';
+      }
+
+      if (remaining <= 0) {
+        clearInterval(timerInterval);
+        maskAllFields();
+        showExpiredState();
+      }
+    }, 1000);
+  }
+
+  function maskAllFields() {
+    fields.forEach(function (el) {
+      var masked = el.getAttribute('data-masked');
+      if (masked) {
+        el.textContent = masked;
+        el.classList.remove('revealed');
+        el.classList.add('re-masked');
+        el.style.userSelect = 'none';
+      }
+    });
+  }
+
+  function showExpiredState() {
+    banner.classList.remove('ephemeral-active');
+    banner.classList.add('ephemeral-expired');
+    icon.className = 'bi bi-lock-fill';
+    icon.style.color = 'var(--danger)';
+    title.textContent = 'Access Expired — Data Re-Masked';
+    title.style.color = 'var(--danger)';
+    desc.innerHTML = 'The viewing window has expired. All sensitive data has been re-masked. Click <strong>Reveal Again</strong> for a new ' + TTL + '-second window.';
+
+    timerEl.classList.add('d-none');
+    timerText.style.color = 'var(--warning)';
+    resetRevealButton();
+    btnReveal.innerHTML = '<i class="bi bi-eye-fill me-1"></i>Reveal Again';
+    btnReveal.classList.remove('d-none');
+  }
+
+  function resetRevealButton() {
+    btnReveal.disabled = false;
+    btnReveal.innerHTML = '<i class="bi bi-eye-fill me-1"></i>Reveal';
+  }
+
+}());
+</script>
+{% endblock %}

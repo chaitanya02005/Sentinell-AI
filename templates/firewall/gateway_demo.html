@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}LLM Gateway - Sentinell.AI{% endblock %}
+{% block page_title %}<i class="bi bi-diagram-3-fill me-2" style="color:var(--primary)"></i>LLM Gateway Demo{% endblock %}
+
+{% block content %}
+<div class="page-wrap fade-in gateway-demo-page">
+  <div class="page-header slide-up stagger-1">
+    <h3 class="page-title">Company LLM Gateway</h3>
+    <p class="page-subtitle">
+      This simulates a company app calling Sentinell before a private LLM such as Ollama.
+    </p>
+  </div>
+
+  <div class="gateway-note slide-up stagger-2">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>Native Ollama chat bypasses Sentinell. This page is the correct enterprise flow: company app -> Sentinell gateway -> Ollama.</span>
+  </div>
+
+  <div class="row g-4 slide-up stagger-3">
+    <div class="col-lg-4">
+      <div class="card gateway-card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-building me-1"></i>Company App</span>
+          <span class="role-badge role-{{ user.role|lower }}">{{ user.get_role_display }}</span>
+        </div>
+        <div class="card-body">
+          <form method="post" action="{% url 'gateway_demo' %}" class="gateway-form">
+            {% csrf_token %}
+            <label class="gateway-label" for="gateway-prompt">Prompt</label>
+            <textarea class="prompt-editor gateway-textarea" name="prompt" id="gateway-prompt" rows="9" placeholder="Example: My email is person@example.com. Draft a support reply.">{{ original_prompt }}</textarea>
+
+            <div class="row g-2 mt-2">
+              <div class="col-6">
+                <label class="gateway-label" for="gateway-provider">Provider</label>
+                <select class="form-select gateway-select" name="provider" id="gateway-provider">
+                  {% for provider in providers %}
+                  <option value="{{ provider.id }}" {% if provider.id == selected_provider %}selected{% endif %}>
+                    {{ provider.id }}{% if not provider.available %} (fallback){% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="gateway-label" for="gateway-model">Model</label>
+                <input class="form-control gateway-input" name="model" id="gateway-model" value="{{ selected_model }}" placeholder="llama3.2">
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mt-3">
+              <i class="bi bi-shield-check me-1"></i>Run Through Sentinell
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      {% if result %}
+      {% with payload=result.payload %}
+      <div class="gateway-flow">
+        <div class="gateway-flow-card">
+          <div class="gateway-flow-head">
+            <span><i class="bi bi-input-cursor-text"></i>Original Prompt</span>
+            <span class="gateway-pill neutral">Browser/App Input</span>
+          </div>
+          <pre class="gateway-pre">{{ result.original_prompt }}</pre>
+        </div>
+
+        <div class="gateway-arrow"><i class="bi bi-arrow-down"></i></div>
+
+        <div class="gateway-flow-card">
+          <div class="gateway-flow-head">
+            <span><i class="bi bi-shield-lock-fill"></i>Sentinell Decision</span>
+            <span class="gateway-pill {% if payload.prompt.action == 'ALLOW' %}allow{% elif payload.prompt.action == 'TOKENIZE' %}tokenize{% else %}block{% endif %}">
+              {{ payload.prompt.action }}
+            </span>
+          </div>
+          <div class="gateway-metrics">
+            <div>
+              <span>Risk</span>
+              <strong>{{ payload.prompt.risk_level }} / {{ payload.prompt.risk_score }}%</strong>
+            </div>
+            <div>
+              <span>Forwarded</span>
+              <strong>{% if payload.gateway.forwarded %}Yes{% else %}No{% endif %}</strong>
+            </div>
+            <div>
+              <span>Provider</span>
+              <strong>{{ payload.gateway.provider }}</strong>
+            </div>
+            <div>
+              <span>Fallback</span>
+              <strong>{% if payload.gateway.fallback_used %}Yes{% else %}No{% endif %}</strong>
+            </div>
+          </div>
+
+          {% if payload.prompt.reasons %}
+          <div class="gateway-reasons">
+            {% for reason in payload.prompt.reasons %}
+            <div><i class="bi bi-arrow-right-short"></i>{{ reason }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="gateway-label mt-3">Prompt Sent To Ollama</div>
+          {% if payload.gateway.forwarded %}
+          <pre class="gateway-pre safe">{{ payload.prompt.processed_prompt }}</pre>
+          {% else %}
+          <pre class="gateway-pre blocked">[BLOCKED - prompt was not forwarded to Ollama]</pre>
+          {% endif %}
+        </div>
+
+        <div class="gateway-arrow"><i class="bi bi-arrow-down"></i></div>
+
+        <div class="gateway-flow-card">
+          <div class="gateway-flow-head">
+            <span><i class="bi bi-cpu-fill"></i>Private LLM Response</span>
+            {% if payload.response %}
+            <span class="gateway-pill {% if payload.response.action == 'ALLOW' %}allow{% elif payload.response.action == 'REDACT' %}tokenize{% else %}block{% endif %}">
+              {{ payload.response.action }}
+            </span>
+            {% else %}
+            <span class="gateway-pill block">NO CALL</span>
+            {% endif %}
+          </div>
+          {% if payload.response %}
+          <pre class="gateway-pre">{{ payload.response.processed_response }}</pre>
+          {% else %}
+          <pre class="gateway-pre blocked">Sentinell stopped the request before the LLM call.</pre>
+          {% endif %}
+        </div>
+      </div>
+      {% endwith %}
+      {% else %}
+      <div class="gateway-empty">
+        <i class="bi bi-diagram-3-fill"></i>
+        <h4>Run a prompt to show the middleware flow</h4>
+        <p>Use an email, phone number, API key, or verbose debug prompt to demonstrate masking and blocking before Ollama receives anything.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

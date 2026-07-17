@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Sentinell.AI Prompt Firewall",
+  "version": "0.1.0",
+  "description": "Checks Gemini prompts with Sentinell.AI before submission.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "https://gemini.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sentinell.AI"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

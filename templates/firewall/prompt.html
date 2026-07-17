@@ -1,0 +1,547 @@
+{% extends "base.html" %}
+{% block title %}AI Prompt – Sentinell.AI{% endblock %}
+{% block page_title %}<i class="bi bi-send-fill me-2" style="color:var(--primary)"></i>AI Prompt Interface{% endblock %}
+
+{% block content %}
+<div class="page-wrap fade-in">
+  <div class="page-header slide-up stagger-1">
+    <h3 class="page-title">AI Prompt Interface</h3>
+    <p class="page-subtitle">
+      {% if user.role == 'INTERN' %}
+        Type a prompt below — document upload is restricted for Intern role.
+      {% else %}
+        Type a prompt or upload a document — both go through the same firewall pipeline.
+      {% endif %}
+    </p>
+  </div>
+  <div class="row g-4 slide-up stagger-2">
+
+    <!-- LEFT: Input Card -->
+    <div class="col-lg-5">
+      <div class="card icard" id="input-card">
+
+        <!-- VIEW A: Normal -->
+        <div class="iview" id="view-normal">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-keyboard me-1"></i>Prompt Editor</span>
+            <span class="role-badge role-{{ user.role|lower }}">{{ user.get_role_display }}</span>
+          </div>
+          <div class="card-body d-flex flex-column" style="overflow-y:auto;">
+            <form method="post" action="{% url 'prompt' %}" id="form-text" enctype="multipart/form-data" class="d-flex flex-column">
+              {% csrf_token %}
+              <textarea class="prompt-editor mb-3" name="prompt" id="prompt-input" rows="8"
+                placeholder="Type your prompt here&#10;&#10;Examples:&#10;• Email: user@example.com&#10;• API key: example-api-key-abc123456789&#10;• Credit card: 4111 1111 1111 1111">{% if result and not result.source_label %}{{ result.original_prompt }}{% endif %}</textarea>
+              <div class="d-flex gap-2 mb-3">
+                <button type="submit" class="btn btn-primary flex-grow-1" id="submit-btn-text">
+                  <span class="btn-text-label"><i class="bi bi-shield-lock-fill me-1"></i>Scan &amp; Submit</span>
+                  <span class="btn-loading-label d-none"><i class="bi bi-hourglass-split me-1"></i>Processing…</span>
+                </button>
+                {% if user.role != 'INTERN' %}
+                <button type="button" class="btn-upload-doc" id="btn-enter-upload" title="Upload Document">
+                  <i class="bi bi-file-earmark-arrow-up"></i>
+                </button>
+                {% endif %}
+                <button type="button" class="btn-clear-prompt" id="btn-clear-prompt" title="Clear Prompt">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </form>
+            <div class="firewall-info">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-shield-fill-check" style="color:var(--info)"></i>
+                <span style="font-size:0.8rem;font-weight:600;color:var(--text)">Active Firewall Rules</span>
+              </div>
+              <div class="rule-group mb-2" style="border-left-color:rgba(248,113,113,0.6)">
+                <div class="rule-group-label" style="color:var(--danger)"><i class="bi bi-x-octagon-fill me-1"></i>Blocked</div>
+                <ul class="rule-list mt-1">
+                  <li><i class="bi bi-x-circle-fill me-1" style="color:var(--danger)"></i>API keys / tokens</li>
+                  <li><i class="bi bi-x-circle-fill me-1" style="color:var(--danger)"></i>Source code / SQL</li>
+                  <li><i class="bi bi-x-circle-fill me-1" style="color:var(--danger)"></i>Cloud credentials</li>
+                  <li><i class="bi bi-x-circle-fill me-1" style="color:var(--danger)"></i>Credit cards / Passwords</li>
+                  <li><i class="bi bi-x-circle-fill me-1" style="color:var(--danger)"></i>Adversarial / Jailbreak</li>
+                </ul>
+              </div>
+              <div class="rule-group" style="border-left-color:rgba(167,139,250,0.5)">
+                <div class="rule-group-label" style="color:var(--violet)"><i class="bi bi-mask me-1"></i>Masked</div>
+                <ul class="rule-list mt-1">
+                  <li><i class="bi bi-shuffle me-1" style="color:var(--violet)"></i>Emails (tokenized)</li>
+                  <li><i class="bi bi-shuffle me-1" style="color:var(--violet)"></i>Phone numbers</li>
+                  <li><i class="bi bi-shuffle me-1" style="color:var(--violet)"></i>Aadhaar numbers</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div><!-- /view-normal -->
+
+        <!-- VIEW B: Upload mode -->
+        <div class="iview iview-hidden" id="view-upload">
+          <div class="card-header d-flex align-items-center gap-2">
+            <button type="button" class="btn-back" id="btn-back-upload"><i class="bi bi-arrow-left"></i></button>
+            <span><i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Document</span>
+          </div>
+          <div class="card-body d-flex flex-column">
+            <form method="post" action="{% url 'prompt' %}" id="form-file" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
+              {% csrf_token %}
+              <div class="up-dropzone flex-grow-1" id="up-dropzone">
+                <div class="up-cloud"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+                <div class="up-title">Drop file here</div>
+                <div class="up-sub">or click to browse</div>
+                <div class="up-formats">PDF · DOCX · TXT · PNG · JPG</div>
+                <input type="file" name="document" id="document-input"
+                  accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.bmp,.tiff,.webp" class="up-input">
+              </div>
+              <div class="up-preview d-none" id="up-preview">
+                <div class="up-prev-icon" id="up-prev-icon"><i class="bi bi-file-earmark"></i></div>
+                <div class="up-prev-info">
+                  <div class="up-prev-name" id="up-prev-name">—</div>
+                  <div class="up-prev-size" id="up-prev-size">—</div>
+                </div>
+                <button type="button" class="up-prev-remove" id="up-prev-remove"><i class="bi bi-x-lg"></i></button>
+              </div>
+              {% if result.source_label %}
+              <div class="up-last-scan mt-2">
+                <i class="bi bi-check-circle-fill me-1" style="color:#34d399"></i>
+                Last scanned: <strong>{{ result.source_label }}</strong>
+              </div>
+              {% endif %}
+              <button type="submit" class="up-analyze-btn mt-3" id="submit-btn-file">
+                <span class="btn-text-label"><i class="bi bi-shield-fill me-2"></i>Analyze File</span>
+                <span class="btn-loading-label d-none"><i class="bi bi-hourglass-split me-2"></i>Processing…</span>
+              </button>
+            </form>
+          </div>
+        </div><!-- /view-upload -->
+
+      </div>
+    </div><!-- /col-lg-5 -->
+
+    <!-- RIGHT: Analysis Report -->
+    <div class="col-lg-7">
+      {% if result %}
+      <div class="result-panel">
+        <div class="report-hdr">
+          <span style="font-size:1.1rem">🔐</span>
+          <span class="report-hdr-title">AI Security Analysis Report</span>
+        </div>
+        <div class="report-meta-grid">
+          <div class="report-meta-item">
+            <div class="meta-label">User Role</div>
+            <div><span class="role-badge role-{{ user.role|lower }}">{{ user.get_role_display }}</span></div>
+          </div>
+          <div class="report-meta-item">
+            <div class="meta-label">Risk Level</div>
+            <div><span class="risk-badge risk-{{ result.risk_level|lower }}">{{ result.risk_level }}</span></div>
+          </div>
+          <div class="report-meta-item">
+            <div class="meta-label">Risk Score</div>
+            <div class="risk-score-val risk-{{ result.risk_level|lower }}">{{ result.risk_score }}%</div>
+          </div>
+        </div>
+        {% if result.source_label %}
+        <div class="result-section" style="padding-top:0.5rem;padding-bottom:0.5rem">
+          <span style="font-size:0.75rem;color:var(--text-3)">
+            <i class="bi bi-file-earmark-arrow-up me-1" style="color:#60a5fa"></i>
+            Input source: <strong style="color:#60a5fa">{{ result.source_label }}</strong>
+          </span>
+        </div>
+        {% endif %}
+        {% if result.source_label %}
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-file-text me-1"></i>Content Analyzed</div>
+          <div class="processed-box mt-2" style="font-size:0.8rem;max-height:130px;overflow-y:auto;white-space:pre-wrap;word-break:break-word">{{ result.original_prompt }}</div>
+        </div>
+        {% endif %}
+        <div class="result-section">
+          <div class="d-flex align-items-center gap-4 flex-wrap">
+            <div class="risk-meter">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--bg-2)" stroke-width="10"/>
+                <circle cx="60" cy="60" r="50" fill="none"
+                  stroke="{% if result.risk_level == 'LOW' %}var(--success){% elif result.risk_level == 'MODERATE' %}var(--info){% elif result.risk_level == 'HIGH' %}var(--warning){% else %}var(--danger){% endif %}"
+                  stroke-width="10" stroke-linecap="round"
+                  stroke-dasharray="{{ result.risk_score|floatformat:0 }} {% widthratio 100 1 2 %}"
+                  style="transition:stroke-dasharray 1s ease;filter:drop-shadow(0 0 6px currentColor)"/>
+              </svg>
+              <div class="risk-meter-val">
+                <span class="risk-score-val risk-{{ result.risk_level|lower }}">{{ result.risk_score }}%</span>
+                <span class="risk-meter-label">{{ result.risk_level }}</span>
+              </div>
+            </div>
+            <div class="flex-grow-1">
+              <div class="risk-bar-track mb-1">
+                <div class="risk-bar-fill risk-bar-{{ result.risk_level|lower }}" style="width:{{ result.risk_score }}%"></div>
+              </div>
+              <div class="risk-bar-labels"><span>Low</span><span>Moderate</span><span>High</span><span>Severe</span><span>Critical</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-search me-1"></i>Detected Entities</div>
+          {% if result.detected_entities %}
+          <div class="d-flex flex-column gap-2 mt-2">
+            {% for entity in result.detected_entities %}
+            <div class="d-flex align-items-center gap-3 p-2 rounded-3"
+              style="background:{% if entity.is_adversarial %}rgba(248,113,113,0.08){% elif entity.is_credential %}rgba(251,146,60,0.08){% elif entity.is_technical %}rgba(96,165,250,0.08){% elif entity.is_pii %}rgba(167,139,250,0.08){% else %}var(--bg-1){% endif %};border:1px solid {% if entity.is_adversarial %}rgba(248,113,113,0.2){% elif entity.is_credential %}rgba(251,146,60,0.2){% elif entity.is_technical %}rgba(96,165,250,0.2){% elif entity.is_pii %}rgba(167,139,250,0.2){% else %}var(--border){% endif %}">
+              <i class="bi {% if entity.is_adversarial %}bi-exclamation-triangle-fill{% elif entity.is_credential %}bi-key-fill{% elif entity.is_technical %}bi-file-earmark-code{% elif entity.is_pii %}bi-person-fill-lock{% else %}bi-question-circle{% endif %}"
+                style="font-size:1rem;color:{% if entity.is_adversarial %}var(--danger){% elif entity.is_credential %}#f59e0b{% elif entity.is_technical %}#60a5fa{% elif entity.is_pii %}var(--violet){% else %}var(--info){% endif %};flex-shrink:0"></i>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:0.82rem;font-weight:600;color:var(--text)">{{ entity.label }}</div>
+                <div style="font-size:0.7rem;color:var(--text-3);font-family:'JetBrains Mono',monospace">{{ entity.dtype_upper }}</div>
+              </div>
+              <span class="detect-tag" style="white-space:nowrap;font-size:0.65rem">
+                {% if entity.is_pii %}🟡 MASK{% elif entity.is_adversarial %}🚫 BLOCK{% elif entity.is_high_risk %}🔴 BLOCK{% else %}⚠️ FLAG{% endif %}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="color:var(--text-3);font-size:0.85rem;margin-top:0.3rem">— No sensitive entities detected</div>
+          {% endif %}
+        </div>
+        {% if result.combined_warning %}
+        <div class="result-section">
+          <div class="alert d-flex gap-3 py-3 px-3 rounded-3 mb-0" style="background:rgba(251,146,60,0.08);border:1.5px solid rgba(251,146,60,0.3);color:var(--text)">
+            <i class="bi bi-shield-fill-exclamation fs-4 mt-1" style="color:#f59e0b;flex-shrink:0"></i>
+            <div>
+              <div class="fw-bold mb-1" style="color:#f59e0b;font-size:0.88rem">PII + Credential Co-occurrence</div>
+              <div class="small" style="color:var(--text-2)">{{ result.combined_warning }}</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% if result.masked_preview %}
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-eye-slash me-1"></i>Masked Output Preview</div>
+          <div class="processed-box mt-2" style="font-size:0.82rem">{{ result.masked_preview }}</div>
+        </div>
+        {% endif %}
+        {% if result.reasons %}
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-list-check me-1"></i>Policy Decisions</div>
+          <ul class="reason-list mt-1" style="list-style:none;padding:0;margin:0">
+            {% for reason in result.reasons %}
+            <li style="padding:4px 0;font-size:0.85rem;color:var(--text-2)"><i class="bi bi-arrow-right-short me-1" style="color:var(--text-3)"></i>{{ reason }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="result-action-hdr {% if result.action == 'ALLOW' %}hdr-allow{% elif result.action == 'BLOCK' %}hdr-block{% else %}hdr-tokenize{% endif %}">
+          {% if result.action == 'ALLOW' %}<i class="bi bi-check-circle-fill me-2"></i>Action Taken: ALLOWED
+          {% elif result.action == 'BLOCK' %}<i class="bi bi-x-octagon-fill me-2"></i>Action Taken: BLOCKED
+          {% else %}<i class="bi bi-shuffle me-2"></i>Action Taken: MASKED{% endif %}
+        </div>
+        {% if result.action == 'BLOCK' %}
+        <div class="result-section">
+          <div class="alert alert-danger d-flex gap-3 py-3 px-3 rounded-3 mb-0" style="border:1.5px solid rgba(248,113,113,0.4)">
+            <i class="bi bi-shield-x fs-3 text-danger mt-1"></i>
+            <div>
+              <div class="fw-bold mb-1" style="color:var(--danger)">Prompt Blocked — High-Risk Content</div>
+              <div class="small" style="color:var(--text-2)">Denied entirely — not sent to AI. Risk: <strong>{{ result.risk_score }}%</strong> ({{ result.risk_level }}).</div>
+            </div>
+          </div>
+        </div>
+        {% if result.block_details %}
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-exclamation-triangle-fill me-1" style="color:var(--danger)"></i>Why This Was Blocked</div>
+          <div class="mt-2 d-flex flex-column gap-2">
+            {% for detail in result.block_details %}
+            <div class="d-flex gap-3 p-3 rounded-3" style="background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.2)">
+              <div style="flex-shrink:0">
+                <span class="detect-tag" style="white-space:nowrap;font-size:0.7rem">{{ detail.dtype }}</span>
+                <div style="font-size:0.65rem;color:var(--text-3);margin-top:3px">{{ detail.label }}</div>
+              </div>
+              <div class="small" style="color:var(--text-2)">{{ detail.explanation }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <div class="report-divider" style="color:var(--danger);border-color:rgba(248,113,113,0.3)">🚫 AI Response Suppressed</div>
+        <div class="text-center py-3" style="color:var(--text-3);font-size:0.83rem">
+          <i class="bi bi-robot me-1"></i>No AI response generated. Blocked prompts never reach the AI model.
+        </div>
+        {% else %}
+        {% if result.action == 'TOKENIZE' %}
+        <div class="result-section">
+          <div class="alert alert-info d-flex align-items-center gap-2 py-2 px-3 small mb-0 rounded-2">
+            <i class="bi bi-shield-check"></i>
+            Personal information was <strong>masked</strong> before the prompt was sent to AI.
+          </div>
+        </div>
+        {% endif %}
+        <div class="report-divider">🤖 AI Response</div>
+        <div class="result-section">
+          <div class="result-section-label"><i class="bi bi-shield-check me-1"></i>Processed Prompt <span style="font-weight:400;font-size:0.65rem;text-transform:none">(sent to AI)</span></div>
+          <div class="processed-box mt-2" style="white-space:pre-wrap;word-break:break-word">{{ result.processed_prompt }}</div>
+        </div>
+        <div class="result-section" style="border-bottom:none">
+          <div class="result-section-label ai-label"><i class="bi bi-robot me-1"></i>AI Response</div>
+          <div class="ai-response-box mt-2">
+            <div class="ai-avatar"><i class="bi bi-cpu-fill"></i></div>
+            <div class="ai-response-text" style="white-space:pre-wrap">{{ result.ai_response }}</div>
+          </div>
+        </div>
+        {% endif %}
+        <div class="report-footer">🛡 Security Enforcement: <strong>ACTIVE</strong></div>
+      </div>
+      {% else %}
+      <div class="result-empty-state">
+        <span class="empty-icon"><i class="bi bi-shield-slash"></i></span>
+        <h5 style="margin-bottom:0.5rem">Awaiting Input</h5>
+        <p style="color:var(--text-2);font-size:0.88rem">Type a prompt or upload a document, then submit.</p>
+        <div class="pipeline mt-3">
+          <div class="pl-step" id="pl-1"><i class="bi bi-search"></i><span>Scan</span></div>
+          <i class="bi bi-arrow-right pl-arrow"></i>
+          <div class="pl-step" id="pl-2"><i class="bi bi-percent"></i><span>Risk Score</span></div>
+          <i class="bi bi-arrow-right pl-arrow"></i>
+          <div class="pl-step" id="pl-3"><i class="bi bi-diagram-3"></i><span>Policy</span></div>
+          <i class="bi bi-arrow-right pl-arrow"></i>
+          <div class="pl-step" id="pl-4"><i class="bi bi-lock"></i><span>Mask</span></div>
+          <i class="bi bi-arrow-right pl-arrow"></i>
+          <div class="pl-step" id="pl-5"><i class="bi bi-robot"></i><span>AI</span></div>
+        </div>
+      </div>
+      {% endif %}
+    </div><!-- /col-lg-7 -->
+
+  </div><!-- /row -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+/* ── Card view switching ──────────────────────────────────────────── */
+.icard { position:relative; overflow:visible; }
+.iview {
+  display:flex; flex-direction:column;
+  opacity:1; transform:translateX(0);
+  transition:opacity 0.25s ease, transform 0.25s ease;
+}
+.iview-hidden {
+  display:none;
+  opacity:0; transform:translateX(40px);
+  pointer-events:none;
+}
+.iview-hidden.iview-active {
+  display:flex;
+  opacity:1; transform:translateX(0);
+  pointer-events:auto;
+}
+.iview.iview-exit {
+  opacity:0; transform:translateX(-40px);
+  pointer-events:none;
+}
+
+/* ── Upload doc icon button ───────────────────────────────────────── */
+.btn-upload-doc {
+  display:flex; align-items:center; justify-content:center;
+  width:42px; height:42px; flex-shrink:0;
+  background:var(--bg-2); border:1.5px solid var(--border);
+  border-radius:10px; color:var(--text-2); font-size:1.1rem;
+  cursor:pointer; transition:background 0.15s,color 0.15s,border-color 0.15s;
+}
+.btn-upload-doc:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+/* ── Clear prompt icon button ────────────────────────────────────── */
+.btn-clear-prompt {
+  display:flex; align-items:center; justify-content:center;
+  width:42px; height:42px; flex-shrink:0;
+  background:var(--bg-2); border:1.5px solid var(--border);
+  border-radius:10px; color:var(--text-2); font-size:1.05rem;
+  cursor:pointer; transition:background 0.15s,color 0.15s,border-color 0.15s,transform 0.1s;
+}
+.btn-clear-prompt:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+.btn-clear-prompt:active { transform:scale(0.92); }
+
+/* ── Back button ──────────────────────────────────────────────────── */
+.btn-back {
+  display:flex; align-items:center; justify-content:center;
+  width:30px; height:30px; flex-shrink:0;
+  background:var(--bg-2); border:1px solid var(--border);
+  border-radius:8px; color:var(--text-2); font-size:0.9rem;
+  cursor:pointer; transition:background 0.15s,color 0.15s;
+}
+.btn-back:hover { background:var(--bg-3,var(--bg-2)); color:var(--text); }
+
+/* ── Drop zone ────────────────────────────────────────────────────── */
+.up-dropzone {
+  position:relative; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:0.55rem;
+  min-height:220px; border-radius:14px;
+  background:#eef1ff; border:2px dashed #c7d2fe;
+  cursor:pointer; transition:border-color 0.2s,background 0.2s;
+  text-align:center; padding:2rem 1.5rem;
+}
+[data-theme="dark"] .up-dropzone,.dark .up-dropzone {
+  background:rgba(99,102,241,0.07); border-color:rgba(99,102,241,0.35);
+}
+.up-dropzone:hover,.up-dropzone.drag-over {
+  border-color:var(--primary); background:rgba(99,102,241,0.12);
+}
+.up-input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.up-cloud {
+  width:56px; height:56px; border-radius:50%; background:var(--primary);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.6rem; color:#fff; margin-bottom:0.15rem;
+}
+.up-title  { font-size:1rem; font-weight:700; color:var(--text); }
+.up-sub    { font-size:0.8rem; color:var(--text-3); font-style:italic; }
+.up-formats {
+  margin-top:0.4rem; font-size:0.75rem; color:var(--text-3);
+  padding:0.25rem 1rem; border:1px solid var(--border);
+  border-radius:20px; background:var(--bg-card,#fff);
+}
+
+/* ── File preview ─────────────────────────────────────────────────── */
+.up-preview {
+  display:flex; align-items:center; gap:0.75rem;
+  padding:0.7rem 1rem; margin-top:0.75rem;
+  border:1.5px solid var(--border); border-radius:10px; background:var(--bg-1);
+}
+.up-prev-icon  { font-size:1.7rem; color:var(--primary); flex-shrink:0; }
+.up-prev-info  { flex:1; min-width:0; }
+.up-prev-name  { font-size:0.82rem; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.up-prev-size  { font-size:0.7rem; color:var(--text-3); margin-top:2px; }
+.up-prev-remove { background:none; border:none; color:var(--text-3); cursor:pointer; padding:4px 6px; border-radius:6px; transition:color 0.15s; }
+.up-prev-remove:hover { color:var(--danger); }
+
+.up-last-scan {
+  font-size:0.75rem; color:var(--text-2); padding:0.35rem 0.75rem;
+  background:rgba(52,211,153,0.07); border:1px solid rgba(52,211,153,0.2); border-radius:8px;
+}
+
+/* ── Analyze File button ──────────────────────────────────────────── */
+.up-analyze-btn {
+  display:flex; align-items:center; justify-content:center; width:100%;
+  padding:0.82rem 1rem; background:var(--primary); color:#fff;
+  border:none; border-radius:10px; font-size:0.92rem; font-weight:600;
+  cursor:pointer; transition:background 0.15s,transform 0.1s;
+}
+.up-analyze-btn:hover  { background:#4f46e5; }
+.up-analyze-btn:active { transform:scale(0.98); }
+.up-analyze-btn:disabled { opacity:0.7; cursor:not-allowed; }
+</style>
+
+<script>
+(function () {
+  var normal = document.getElementById('view-normal');
+  var upload = document.getElementById('view-upload');
+
+  /* ── Enter upload mode ────────────────────────────────────────── */
+  function enterUpload() {
+    normal.classList.add('iview-exit');
+    setTimeout(function () {
+      normal.classList.add('iview-hidden');
+      normal.classList.remove('iview-exit');
+      upload.classList.remove('iview-hidden');
+      upload.classList.add('iview-active');
+    }, 200);
+  }
+
+  /* ── Exit upload mode ─────────────────────────────────────────── */
+  function exitUpload() {
+    upload.classList.remove('iview-active');
+    upload.classList.add('iview-hidden');
+    normal.classList.remove('iview-hidden');
+    clearFile();
+  }
+
+  var btnEnterUpload = document.getElementById('btn-enter-upload');
+  if (btnEnterUpload) btnEnterUpload.addEventListener('click', enterUpload);
+  document.getElementById('btn-back-upload').addEventListener('click', exitUpload);
+
+  /* ── Clear prompt button ─────────────────────────────────────── */
+  document.getElementById('btn-clear-prompt').addEventListener('click', function () {
+    var ta = document.getElementById('prompt-input');
+    if (ta) { ta.value = ''; ta.focus(); }
+    /* If there's a result panel visible, redirect to fresh prompt page */
+    var resultPanel = document.querySelector('.result-panel');
+    if (resultPanel) { window.location.href = '{% url "prompt" %}'; }
+  });
+
+  /* Auto-enter upload mode if last result was from a document */
+  {% if result.source_label %}enterUpload();{% endif %}
+
+  /* ── File input ───────────────────────────────────────────────── */
+  var input     = document.getElementById('document-input');
+  var dropzone  = document.getElementById('up-dropzone');
+  var preview   = document.getElementById('up-preview');
+  var prevName  = document.getElementById('up-prev-name');
+  var prevSize  = document.getElementById('up-prev-size');
+  var removeBtn = document.getElementById('up-prev-remove');
+
+  var ICONS = {
+    pdf:'bi-file-earmark-pdf', docx:'bi-file-earmark-word', doc:'bi-file-earmark-word',
+    txt:'bi-file-earmark-text', png:'bi-file-earmark-image', jpg:'bi-file-earmark-image',
+    jpeg:'bi-file-earmark-image', bmp:'bi-file-earmark-image',
+    tiff:'bi-file-earmark-image', tif:'bi-file-earmark-image', webp:'bi-file-earmark-image',
+  };
+  function fmt(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+
+  function showFile(file) {
+    var ext = file.name.split('.').pop().toLowerCase();
+    document.querySelector('.up-prev-icon').innerHTML = '<i class="bi '+(ICONS[ext]||'bi-file-earmark')+'"></i>';
+    prevName.textContent = file.name;
+    prevSize.textContent = fmt(file.size);
+    dropzone.classList.add('d-none');
+    preview.classList.remove('d-none');
+  }
+  function clearFile() {
+    if (input) input.value = '';
+    if (dropzone) dropzone.classList.remove('d-none');
+    if (preview)  preview.classList.add('d-none');
+  }
+
+  if (input)     input.addEventListener('change', function () { if (this.files[0]) showFile(this.files[0]); });
+  if (removeBtn) removeBtn.addEventListener('click', clearFile);
+
+  if (dropzone) {
+    dropzone.addEventListener('dragover',  function (e) { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', function ()  { dropzone.classList.remove('drag-over'); });
+    dropzone.addEventListener('drop', function (e) {
+      e.preventDefault(); dropzone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) {
+        var dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+        input.files = dt.files; showFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
+  /* ── Submit loading ───────────────────────────────────────────── */
+  [['form-text','submit-btn-text'],['form-file','submit-btn-file']].forEach(function (p) {
+    var form = document.getElementById(p[0]);
+    var btn  = document.getElementById(p[1]);
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+      btn.querySelector('.btn-text-label').classList.add('d-none');
+      btn.querySelector('.btn-loading-label').classList.remove('d-none');
+      btn.disabled = true;
+      ['pl-1','pl-2','pl-3','pl-4','pl-5'].forEach(function (id, i) {
+        setTimeout(function () { var el=document.getElementById(id); if(el) el.classList.add('active'); }, i*300);
+      });
+    });
+  });
+
+  /* ── Idle pipeline animation ──────────────────────────────────── */
+  var plSteps = document.querySelectorAll('.pl-step');
+  if (plSteps.length) {
+    var idx = 0;
+    setInterval(function () {
+      plSteps.forEach(function (s) { s.classList.remove('active'); });
+      plSteps[idx].classList.add('active');
+      idx = (idx+1) % plSteps.length;
+    }, 900);
+  }
+
+  /* ── Risk meter ───────────────────────────────────────────────── */
+  var arc = document.querySelector('circle[stroke-dasharray]');
+  if (arc) {
+    var val = {{ result.risk_score|default:0 }};
+    var circ = 2*Math.PI*50;
+    arc.style.strokeDasharray = '0 '+circ;
+    setTimeout(function () { arc.style.strokeDasharray = (val/100*circ)+' '+circ; }, 100);
+  }
+
+}());
+</script>
+{% endblock %}

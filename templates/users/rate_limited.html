@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Rate Limited – Sentinell.AI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}"/>
+  <style>
+    html,body{height:100%;margin:0;padding:0;background:var(--bg)}
+    .rate-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+    .rate-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);max-width:440px;width:100%;overflow:hidden;text-align:center}
+    .rate-header{background:linear-gradient(135deg,#DC2626,#EF4444);padding:2.5rem 2rem}
+    .rate-header-icon{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);display:inline-flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff;margin-bottom:1rem}
+    .rate-header h2{color:#fff;font-size:1.5rem;font-weight:700;margin:0}
+    .rate-header p{color:rgba(255,255,255,0.85);font-size:0.88rem;margin-top:6px}
+    .rate-body{padding:2rem}
+    .rate-body p{font-size:0.88rem;color:var(--text-2);line-height:1.7}
+    .countdown{font-size:2rem;font-weight:800;color:var(--danger);margin:1rem 0;font-family:'JetBrains Mono',monospace}
+    .back-link{display:inline-flex;align-items:center;gap:6px;margin-top:1rem;font-size:0.85rem;color:var(--primary);text-decoration:none;font-weight:500}
+    .back-link:hover{text-decoration:underline}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .fade-in{animation:fadeIn 0.5s ease forwards}
+  </style>
+</head>
+<body>
+<div class="rate-page">
+  <div class="rate-card fade-in">
+    <div class="rate-header">
+      <div class="rate-header-icon">
+        <i class="bi bi-shield-exclamation"></i>
+      </div>
+      <h2>Too Many Requests</h2>
+      <p>Rate limit exceeded for security</p>
+    </div>
+    <div class="rate-body">
+      <p>You've made too many requests in a short period. This is a security measure to protect your account.</p>
+      <div class="countdown" id="countdown">60</div>
+      <p style="font-size:0.78rem;color:var(--text-3)">seconds until you can try again</p>
+      <a href="{% url 'login' %}" class="back-link">
+        <i class="bi bi-arrow-left"></i>Back to Login
+      </a>
+    </div>
+  </div>
+</div>
+<script>
+var seconds = 60;
+var el = document.getElementById('countdown');
+var interval = setInterval(function() {
+  seconds--;
+  el.textContent = seconds;
+  if (seconds <= 0) {
+    clearInterval(interval);
+    window.location.href = '{% url "login" %}';
+  }
+}, 1000);
+</script>
+</body>
+</html>
